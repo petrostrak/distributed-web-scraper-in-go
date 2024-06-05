@@ -28,18 +28,39 @@ func NewManager() actor.Producer {
 func (m *Manager) Receive(c *actor.Context) {
 	switch msg := c.Message().(type) {
 	case VisitRequest:
-		m.handleVisitRequest(msg)
+		m.handleVisitRequest(c, msg)
 	case actor.Started:
 		slog.Info("manager started")
 	case actor.Stopped:
 	}
 }
 
-func (m *Manager) handleVisitRequest(msg VisitRequest) error {
+func (m *Manager) handleVisitRequest(c *actor.Context, msg VisitRequest) error {
 	for _, link := range msg.links {
 		slog.Info("visiting url", "url", link)
+		c.SpawnChild(NewVisitor(link), fmt.Sprintf("visitor/%s", link))
 	}
 	return nil
+}
+
+type Visitor struct {
+	URL string
+}
+
+func NewVisitor(url string) actor.Producer {
+	return func() actor.Receiver {
+		return &Visitor{
+			URL: url,
+		}
+	}
+}
+
+func (v *Visitor) Receive(c *actor.Context) {
+	switch c.Message().(type) {
+	case actor.Started:
+		slog.Info("visitor started working on url", "url", v.URL)
+	case actor.Stopped:
+	}
 }
 
 func extractLinks(body io.Reader) []string {
