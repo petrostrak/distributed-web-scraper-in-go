@@ -1,25 +1,49 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"log/slog"
 	"time"
 
 	"github.com/anthdm/hollywood/actor"
 )
+
+type VisitRequest struct {
+	links []string
+}
+
+type Manager struct{}
+
+func NewManager() actor.Producer {
+	return func() actor.Receiver {
+		return &Manager{}
+	}
+}
+
+func (m *Manager) Receive(c *actor.Context) {
+	switch msg := c.Message().(type) {
+	case VisitRequest:
+		m.handleVisitRequest(msg)
+	case actor.Started:
+		slog.Info("manager started")
+	case actor.Stopped:
+	}
+}
+
+func (m *Manager) handleVisitRequest(msg VisitRequest) error {
+	for _, link := range msg.links {
+		slog.Info("visiting url", "url", link)
+	}
+	return nil
+}
 
 func main() {
 	engine, err := actor.NewEngine(actor.NewEngineConfig())
 	if err != nil {
 		log.Fatal(err)
 	}
-	engine.SpawnFunc(func(ctx *actor.Context) {
-		switch msg := ctx.Message().(type) {
-		case actor.Started:
-			fmt.Println("started")
-			_ = msg
-		}
-	}, "foo")
+
+	pid := engine.Spawn(NewManager(), "manager")
 
 	time.Sleep(5 * time.Second)
 }
