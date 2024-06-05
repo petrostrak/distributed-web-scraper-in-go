@@ -45,5 +45,7 @@ func main() {
 
 	pid := engine.Spawn(NewManager(), "manager")
 
+	engine.Send(pid, VisitRequest{links: []string{"https://petrostrak.app/"}})
+
 	time.Sleep(5 * time.Second)
 }
