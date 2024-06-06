@@ -17,11 +17,15 @@ type VisitRequest struct {
 	links []string
 }
 
-type Manager struct{}
+type Manager struct {
+	visitors map[*actor.PID]bool
+}
 
 func NewManager() actor.Producer {
 	return func() actor.Receiver {
-		return &Manager{}
+		return &Manager{
+			visitors: make(map[*actor.PID]bool),
+		}
 	}
 }
 
@@ -38,19 +42,21 @@ func (m *Manager) Receive(c *actor.Context) {
 func (m *Manager) handleVisitRequest(c *actor.Context, msg VisitRequest) error {
 	for _, link := range msg.links {
 		slog.Info("visiting url", "url", link)
-		c.SpawnChild(NewVisitor(link), fmt.Sprintf("visitor/%s", link))
+		c.SpawnChild(NewVisitor(link, c.PID()), fmt.Sprintf("visitor/%s", link))
 	}
 	return nil
 }
 
 type Visitor struct {
-	URL string
+	managerPID *actor.PID
+	URL        string
 }
 
-func NewVisitor(url string) actor.Producer {
+func NewVisitor(url string, mpid *actor.PID) actor.Producer {
 	return func() actor.Receiver {
 		return &Visitor{
-			URL: url,
+			managerPID: mpid,
+			URL:        url,
 		}
 	}
 }
@@ -64,7 +70,7 @@ func (v *Visitor) Receive(c *actor.Context) {
 			slog.Error("visit error", "err", err)
 			return
 		}
-		fmt.Println(links)
+		c.Send(v.managerPID, VisitRequest{links: links})
 	case actor.Stopped:
 	}
 }
