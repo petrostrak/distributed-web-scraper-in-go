@@ -71,7 +71,9 @@ func (v *Visitor) Receive(c *actor.Context) {
 			return
 		}
 		c.Send(v.managerPID, VisitRequest{links: links})
+		c.Engine().Poison(c.PID())
 	case actor.Stopped:
+		slog.Info("visitor stopped", "url", v.URL)
 	}
 }
 
