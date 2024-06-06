@@ -59,6 +59,12 @@ func (v *Visitor) Receive(c *actor.Context) {
 	switch c.Message().(type) {
 	case actor.Started:
 		slog.Info("visitor started working on url", "url", v.URL)
+		links, err := visit(v.URL)
+		if err != nil {
+			slog.Error("visit error", "err", err)
+			return
+		}
+		fmt.Println(links)
 	case actor.Stopped:
 	}
 }
@@ -117,7 +123,6 @@ func main() {
 	}
 
 	pid := engine.Spawn(NewManager(), "manager")
-
 	engine.Send(pid, VisitRequest{links: []string{"https://petrostrak.netlify.app"}})
 
 	time.Sleep(5 * time.Second)
