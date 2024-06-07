@@ -97,6 +97,9 @@ func (v *Visitor) extractLinks(body io.Reader) []string {
 
 			if token.Data == "a" {
 				for _, attr := range token.Attr {
+					if attr.Val == "#" {
+						continue
+					}
 					if attr.Key == "href" {
 						links = append(links, attr.Val)
 					}
