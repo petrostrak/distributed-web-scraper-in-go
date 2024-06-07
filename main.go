@@ -18,12 +18,14 @@ type VisitRequest struct {
 }
 
 type Manager struct {
+	visited  map[string]bool
 	visitors map[*actor.PID]bool
 }
 
 func NewManager() actor.Producer {
 	return func() actor.Receiver {
 		return &Manager{
+			visited:  make(map[string]bool),
 			visitors: make(map[*actor.PID]bool),
 		}
 	}
@@ -41,8 +43,11 @@ func (m *Manager) Receive(c *actor.Context) {
 
 func (m *Manager) handleVisitRequest(c *actor.Context, msg VisitRequest) error {
 	for _, link := range msg.links {
-		slog.Info("visiting url", "url", link)
-		c.SpawnChild(NewVisitor(link, c.PID()), fmt.Sprintf("visitor/%s", link))
+		if _, found := m.visited[link]; !found {
+			slog.Info("visiting url", "url", link)
+			c.SpawnChild(NewVisitor(link, c.PID()), fmt.Sprintf("visitor/%s", link))
+			m.visited[link] = true
+		}
 	}
 	return nil
 }
@@ -65,7 +70,7 @@ func (v *Visitor) Receive(c *actor.Context) {
 	switch c.Message().(type) {
 	case actor.Started:
 		slog.Info("visitor started working on url", "url", v.URL)
-		links, err := visit(v.URL)
+		links, err := v.visit(v.URL)
 		if err != nil {
 			slog.Error("visit error", "err", err)
 			return
@@ -77,7 +82,7 @@ func (v *Visitor) Receive(c *actor.Context) {
 	}
 }
 
-func extractLinks(body io.Reader) []string {
+func (v *Visitor) extractLinks(body io.Reader) []string {
 	links := make([]string, 0)
 	tokenizer := html.NewTokenizer(body)
 
@@ -101,7 +106,7 @@ func extractLinks(body io.Reader) []string {
 	}
 }
 
-func visit(link string) ([]string, error) {
+func (v *Visitor) visit(link string) ([]string, error) {
 	baseURL, err := url.Parse(link)
 	if err != nil {
 		return nil, err
@@ -113,10 +118,10 @@ func visit(link string) ([]string, error) {
 	}
 
 	urls := make([]string, 0)
-	for _, link := range extractLinks(resp.Body) {
+	for _, link := range v.extractLinks(resp.Body) {
 		linkUrl, err := url.Parse(link)
 		if err != nil {
-			fmt.Println(err)
+			return urls, err
 		}
 		urls = append(urls, baseURL.ResolveReference(linkUrl).String())
 	}
